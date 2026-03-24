@@ -2143,6 +2143,72 @@ function _rerenderCtCard(ctId){
 //  _buildContractCard — gera o HTML de um card de contrato
 //  Separado para permitir re-render individual (navegação período)
 // ════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
+//  _buildFatSection — Seção de Faturamento no card do contrato
+//  Busca a medição mais recente com dados de faturamento
+// ════════════════════════════════════════════════════════════
+function _buildFatSection(c, ST){
+  const meds = (ST.medicoes||[]).filter(function(m){
+    return m.contractId===c.id && (m.dtEntrega||m.dtAutFat||m.dtFatura||m.resumoFat);
+  });
+  if(!meds.length) return '';
+  meds.sort(function(a,b){ return b.key.localeCompare(a.key); });
+  var mf = meds[0];
+  var parts = mf.key.split('-');
+  var mfLbl = new Date(parseInt(parts[0]), parseInt(parts[1])-1, 1)
+    .toLocaleDateString('pt-BR',{month:'short',year:'2-digit'}).replace('.','').toUpperCase();
+
+  function fmtD(d){
+    if(!d) return '—';
+    return new Date(d+'T00:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'short',year:'2-digit'}).replace('.','');
+  }
+
+  var hoje_f = new Date(); hoje_f.setHours(0,0,0,0);
+  var diasFatura = mf.dtFatura ? Math.round((hoje_f - new Date(mf.dtFatura+'T00:00:00'))/86400000) : null;
+  var diasTag = '';
+  if(diasFatura!==null){
+    if(diasFatura>30)      diasTag = '<span style="font-size:9px;color:var(--rdl);font-weight:800">⚠️ '+diasFatura+'d atrás</span>';
+    else if(diasFatura>15) diasTag = '<span style="font-size:9px;color:var(--gl);font-weight:800">'+diasFatura+'d atrás</span>';
+    else                   diasTag = '<span style="font-size:9px;color:var(--gnl);font-weight:800">'+diasFatura+'d atrás</span>';
+  }
+
+  var hasDates = mf.dtEntrega||mf.dtAutFat||mf.dtFatura;
+
+  var datesHTML = '';
+  if(hasDates){
+    datesHTML = '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:'+(mf.resumoFat?'10px':'0')+'">'
+      +'<div style="background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.18);border-radius:10px;padding:9px 10px">'
+        +'<div style="font-size:8px;font-weight:800;letter-spacing:1.5px;color:#fbbf24;text-transform:uppercase;margin-bottom:4px">📬 Entrega Med.</div>'
+        +'<div style="font-family:var(--fn);font-size:12px;font-weight:700;color:var(--tx)">'+fmtD(mf.dtEntrega)+'</div>'
+      +'</div>'
+      +'<div style="background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.18);border-radius:10px;padding:9px 10px">'
+        +'<div style="font-size:8px;font-weight:800;letter-spacing:1.5px;color:#34d399;text-transform:uppercase;margin-bottom:4px">✅ Aut. Faturamento</div>'
+        +'<div style="font-family:var(--fn);font-size:12px;font-weight:700;color:var(--tx)">'+fmtD(mf.dtAutFat)+'</div>'
+      +'</div>'
+      +'<div style="background:rgba(56,189,248,.06);border:1px solid rgba(56,189,248,.18);border-radius:10px;padding:9px 10px">'
+        +'<div style="font-size:8px;font-weight:800;letter-spacing:1.5px;color:#38bdf8;text-transform:uppercase;margin-bottom:4px">📤 Envio Fatura</div>'
+        +'<div style="font-family:var(--fn);font-size:12px;font-weight:700;color:var(--tx);display:flex;align-items:center;gap:5px">'+fmtD(mf.dtFatura)+(diasTag?' '+diasTag:'')+'</div>'
+      +'</div>'
+    +'</div>';
+  }
+
+  var resumoHTML = '';
+  if(mf.resumoFat){
+    resumoHTML = '<div style="background:rgba(196,181,253,.05);border:1px solid rgba(196,181,253,.15);border-radius:10px;padding:10px 12px">'
+      +'<div style="font-size:8px;font-weight:800;letter-spacing:1.5px;color:#c4b5fd;text-transform:uppercase;margin-bottom:6px">📋 Resumo / Prazos Contratuais</div>'
+      +'<div style="font-size:11px;color:var(--t2);line-height:1.55;white-space:pre-wrap">'+mf.resumoFat+'</div>'
+    +'</div>';
+  }
+
+  return '<div class="cc-section">'
+    +'<div class="cc-section-lbl" style="display:flex;align-items:center;justify-content:space-between">'
+      +'<span>🧾 Faturamento — <span style="font-family:var(--fn);font-size:9px;color:var(--ac2);font-weight:800">'+mfLbl+'</span></span>'
+    +'</div>'
+    +datesHTML
+    +resumoHTML
+  +'</div>';
+}
+
 function _buildContractCard(c, tasks, pendT){
   const hoje2 = new Date(); hoje2.setHours(0,0,0,0);
 
@@ -2395,7 +2461,11 @@ function _buildContractCard(c, tasks, pendT){
       </div>
     </div>
 
-    <!-- ══ SEÇÃO 6: PAINEL DE TAREFAS ══ -->
+    <!-- ══ SEÇÃO 6: FATURAMENTO ══ -->
+    ${_buildFatSection(c, ST)}
+
+    <!-- ══ SEÇÃO 7: PAINEL DE TAREFAS ══ -->
+    <!-- ══ SEÇÃO 7: PAINEL DE TAREFAS ══ -->
     <div class="cc-section contract-tasks-wrap" style="border-bottom:none">
       <div class="task-panel-hdr">
         <div class="task-panel-title">📋 Painel de Tarefas</div>
@@ -7210,6 +7280,27 @@ function openMedNovaModal(prefillCtId){
         <div class="flbl">🔗 Boletim de Medição (Google Drive)</div>
         <input class="finp" id="mn-link" placeholder="Cole o link do Google Drive aqui (https://...)">
       </div>
+      <div style="margin-top:4px;padding-top:14px;border-top:1px solid var(--b1)">
+        <div style="font-size:10px;font-weight:800;letter-spacing:2px;color:var(--t3);text-transform:uppercase;margin-bottom:12px">📅 Datas de Faturamento</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+          <div class="fgrp">
+            <div class="flbl" style="color:#fbbf24">📬 Data de Entrega da Medição</div>
+            <input class="finp" type="date" id="mn-dt-entrega">
+          </div>
+          <div class="fgrp">
+            <div class="flbl" style="color:#34d399">✅ Data Autorização Faturamento</div>
+            <input class="finp" type="date" id="mn-dt-autfat">
+          </div>
+          <div class="fgrp">
+            <div class="flbl" style="color:#38bdf8">📤 Data Envio da Fatura</div>
+            <input class="finp" type="date" id="mn-dt-fatura">
+          </div>
+        </div>
+      </div>
+      <div class="fgrp" style="margin-top:4px">
+        <div class="flbl" style="color:#c4b5fd">📋 Resumo / Prazos de Faturamento do Contrato</div>
+        <textarea class="ftxa" id="mn-resumo-fat" placeholder="Descreva prazos contratuais de faturamento, condições, observações gerais sobre o ciclo de medição e pagamento..." style="min-height:90px"></textarea>
+      </div>
     </div>`;
 
   document.getElementById('modal-footer').innerHTML = `
@@ -7234,6 +7325,10 @@ function saveMedNova(){
 
   const existing = ST.medicoes.findIndex(m=>m.contractId===contractId&&m.key===mesKey);
   const custStr  = document.getElementById('mn-cust').value;
+  const dtEntrega  = (document.getElementById('mn-dt-entrega')||{}).value?.trim()||'';
+  const dtAutFat   = (document.getElementById('mn-dt-autfat')||{}).value?.trim()||'';
+  const dtFatura   = (document.getElementById('mn-dt-fatura')||{}).value?.trim()||'';
+  const resumoFat  = (document.getElementById('mn-resumo-fat')||{}).value?.trim()||'';
   const obj = {
     contractId,
     key      : mesKey,
@@ -7241,6 +7336,10 @@ function saveMedNova(){
     realizado: realStr!==''?parseFloat(realStr):null,
     custo    : custStr!==''?parseFloat(custStr):null,
     obs,
+    dtEntrega  : dtEntrega  || null,
+    dtAutFat   : dtAutFat   || null,
+    dtFatura   : dtFatura   || null,
+    resumoFat  : resumoFat  || null,
   };
   if(existing>=0) ST.medicoes[existing]=obj;
   else ST.medicoes.push(obj);
@@ -7322,6 +7421,27 @@ function openMedModal(contractId, mesKey){
         <input class="finp" id="med-link" value="${rec.link||''}"
           placeholder="Cole o link do Google Drive aqui (https://...)">
       </div>
+      <div style="margin-top:4px;padding-top:14px;border-top:1px solid var(--b1)">
+        <div style="font-size:10px;font-weight:800;letter-spacing:2px;color:var(--t3);text-transform:uppercase;margin-bottom:12px">📅 Datas de Faturamento</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+          <div class="fgrp">
+            <div class="flbl" style="color:#fbbf24">📬 Data de Entrega da Medição</div>
+            <input class="finp" type="date" id="med-dt-entrega" value="${rec.dtEntrega||''}">
+          </div>
+          <div class="fgrp">
+            <div class="flbl" style="color:#34d399">✅ Data Autorização Faturamento</div>
+            <input class="finp" type="date" id="med-dt-autfat" value="${rec.dtAutFat||''}">
+          </div>
+          <div class="fgrp">
+            <div class="flbl" style="color:#38bdf8">📤 Data Envio da Fatura</div>
+            <input class="finp" type="date" id="med-dt-fatura" value="${rec.dtFatura||''}">
+          </div>
+        </div>
+      </div>
+      <div class="fgrp" style="margin-top:4px">
+        <div class="flbl" style="color:#c4b5fd">📋 Resumo / Prazos de Faturamento do Contrato</div>
+        <textarea class="ftxa" id="med-resumo-fat" placeholder="Descreva prazos contratuais de faturamento, condições e observações sobre o ciclo de medição e pagamento..." style="min-height:90px">${rec.resumoFat||''}</textarea>
+      </div>
       ${hasDev ? `
       <div style="padding:10px 14px;border-radius:8px;background:rgba(37,99,235,.07);border:1px solid rgba(37,99,235,.18);
           display:flex;align-items:center;justify-content:space-between">
@@ -7348,6 +7468,10 @@ function saveMed(contractId, mesKey){
   const cust = document.getElementById('med-cust').value;
   const obs  = document.getElementById('med-obs').value.trim();
   const link = normalizeUrl((document.getElementById('med-link')||{}).value?.trim()||'');
+  const dtEntrega  = (document.getElementById('med-dt-entrega')||{}).value?.trim()||'';
+  const dtAutFat   = (document.getElementById('med-dt-autfat')||{}).value?.trim()||'';
+  const dtFatura   = (document.getElementById('med-dt-fatura')||{}).value?.trim()||'';
+  const resumoFat  = (document.getElementById('med-resumo-fat')||{}).value?.trim()||'';
   if(prev===''&&real===''){ showToast('⛔ Informe ao menos um valor.','rd'); return; }
   const obj = {
     contractId,
@@ -7356,6 +7480,10 @@ function saveMed(contractId, mesKey){
     realizado: real!==''?parseFloat(real):null,
     custo    : cust!==''?parseFloat(cust):null,
     obs, link,
+    dtEntrega  : dtEntrega  || null,
+    dtAutFat   : dtAutFat   || null,
+    dtFatura   : dtFatura   || null,
+    resumoFat  : resumoFat  || null,
   };
   const idx = ST.medicoes.findIndex(m=>m.contractId===contractId&&m.key===mesKey);
   if(idx>=0) ST.medicoes[idx]=obj; else ST.medicoes.push(obj);
